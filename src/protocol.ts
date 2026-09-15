@@ -13,14 +13,13 @@ export const ERROR_TEXT: Record<ErrorCode, string> = {
   'export-failed': 'Figma could not export this node as SVG.',
 };
 
-/** The two Figma export-panel switches the plugin mirrors. Structured-clone-safe booleans. */
+/** The Figma export-panel switch the plugin mirrors. Structured-clone-safe booleans. */
 export interface SvgExportSettings {
-  svgIdAttribute: boolean;
   svgOutlineText: boolean;
 }
 
-/** Figma's own defaults are the opposite of both; see DESIGN.md §8 for why these win. */
-export const DEFAULT_SVG_EXPORT: SvgExportSettings = { svgIdAttribute: true, svgOutlineText: false };
+/** Figma's own default is the opposite; see DESIGN.md §8 for why this one wins. */
+export const DEFAULT_SVG_EXPORT: SvgExportSettings = { svgOutlineText: false };
 
 /** Sandbox -> UI. Sent with figma.ui.postMessage(msg) — no wrapper. */
 export type CodeToUi =

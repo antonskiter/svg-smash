@@ -12,9 +12,11 @@ import {
 
 const UI_SIZE = { width: 400, height: 560, themeColors: true, title: 'SVG Smash' } as const;
 
-/** The panel's two switches ride on `export-request`; the format never varies. */
+/** The panel's switch rides on `export-request`; the format never varies. */
+// Ids are always on: with them off, exportAsync drops <g> wrappers that only carry a blend mode.
 const exportSettings = (settings: SvgExportSettings): ExportSettingsSVGString => ({
   format: 'SVG_STRING',
+  svgIdAttribute: true,
   ...settings,
 });
 

@@ -23,15 +23,15 @@ reloads `dist/` when you re-run the plugin.
 1. Select one or more frames or components on the canvas.
 2. Set **Quality** (1–100, default 85). Lower means smaller and softer.
 3. Optionally turn on **Downscale to displayed size ×2** to re-sample oversized bitmaps.
-4. Leave **Include "id" attribute** on and **Outline text** off unless you need otherwise.
+4. Leave **Outline text** off unless you need otherwise.
 5. Press **Export as WebP SVG**.
 
-These last two mirror Figma's own SVG export panel and are passed straight to `exportAsync`:
+Every export sets Figma's `svgIdAttribute` on, because with ids off its exporter drops `<g>`
+wrappers whose only attribute is `style="mix-blend-mode:…"` and a gradient meant to tint an image
+then paints flat over it.
 
-- **Include "id" attribute** (on by default). Figma's own default is off, and with ids off its
-  exporter drops `<g>` wrappers whose only attribute is `style="mix-blend-mode:…"` — a gradient
-  meant to tint an image then paints flat over it. Turning ids on keeps those groups, at the cost
-  of a layer-name id on every element.
+**Outline text** mirrors Figma's own SVG export panel and is passed straight to `exportAsync`:
+
 - **Outline text** (off by default). Off keeps live `<text>` elements and their font names, which
   stays editable and searchable but needs the font installed wherever the file is opened. Turn it
   on to convert text to paths, which renders identically everywhere.

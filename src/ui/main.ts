@@ -57,7 +57,6 @@ const downscaleInput = el<HTMLInputElement>('downscale');
 
 /** One checkbox per SvgExportSettings key, so the wire shape and the DOM cannot drift. */
 const EXPORT_SETTING_INPUT: Record<keyof SvgExportSettings, HTMLInputElement> = {
-  svgIdAttribute: el<HTMLInputElement>('svg-id-attribute'),
   svgOutlineText: el<HTMLInputElement>('svg-outline-text'),
 };
 
@@ -113,9 +112,8 @@ const readOptions = (): TransformOptions => ({
   downscale: downscaleInput.checked,
 });
 
-/** Read at export time like the options above; these ones ride to the sandbox on `export-request`. */
+/** Read at export time like the options above; this one rides to the sandbox on `export-request`. */
 const readExportSettings = (): SvgExportSettings => ({
-  svgIdAttribute: EXPORT_SETTING_INPUT.svgIdAttribute.checked,
   svgOutlineText: EXPORT_SETTING_INPUT.svgOutlineText.checked,
 });
 

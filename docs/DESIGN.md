@@ -227,14 +227,13 @@ export const ERROR_TEXT: Record<ErrorCode, string> = {
   'export-failed': 'Figma could not export this node as SVG.',
 };
 
-/** The two Figma export-panel switches the plugin mirrors. Structured-clone-safe booleans. */
+/** The Figma export-panel switch the plugin mirrors. Structured-clone-safe booleans. */
 export interface SvgExportSettings {
-  svgIdAttribute: boolean;
   svgOutlineText: boolean;
 }
 
-/** Figma's own defaults are the opposite of both; see §8 for why these win. */
-export const DEFAULT_SVG_EXPORT: SvgExportSettings = { svgIdAttribute: true, svgOutlineText: false };
+/** Figma's own default is the opposite; see §8 for why this one wins. */
+export const DEFAULT_SVG_EXPORT: SvgExportSettings = { svgOutlineText: false };
 
 /** Sandbox -> UI. Sent with figma.ui.postMessage(msg) — no wrapper. */
 export type CodeToUi =
@@ -255,18 +254,20 @@ export type UiToCode =
 
 Rules that follow from it:
 
-- **Quality and downscale never cross the boundary; the two SVG export switches must.** Quality and downscale drive the encoder, which runs in the iframe, so they live in the UI DOM and are read at export time by `readOptions()` — putting them on the wire would create a stale-echo desync for zero benefit. `svgIdAttribute` and `svgOutlineText` drive `exportAsync`, which runs in the sandbox, so they are read the same way by `readExportSettings()` and travel as the `settings` payload of `export-request`. Neither set is persisted; they reset to 85 / off / ids-on / outline-off each run.
+- **Quality and downscale never cross the boundary; the SVG export switch must.** Quality and downscale drive the encoder, which runs in the iframe, so they live in the UI DOM and are read at export time by `readOptions()` — putting them on the wire would create a stale-echo desync for zero benefit. `svgOutlineText` drives `exportAsync`, which runs in the sandbox, so it is read the same way by `readExportSettings()` and travels as the `settings` payload of `export-request`. `svgIdAttribute` is not on the wire at all: it is hard-wired on in `exportSettings` (§3.1). Neither set is persisted; they reset to 85 / off / outline-off each run.
 - **One `svg` message per node, whole string.** No chunking, no `Uint8Array`, no `TextDecoder`. There is no documented size cap (see risk 4); if one surfaces, chunking is a protocol-local change with no transform impact.
 - **Handshake first.** `code.ts` sends nothing until `ui-ready` arrives. Pre-load message queueing is unverified and is not relied on.
 - **Per-node errors.** A node that fails `exportAsync` produces `error` with `code: 'export-failed'` and the loop continues; `export-end` always arrives.
-- **There is no progress message on the UI→sandbox channel.** Progress is rendered inside the iframe (§6 item 8) and has no second consumer, so nothing sends it and nothing would receive it.
+- **There is no progress message on the UI→sandbox channel.** Progress is rendered inside the iframe (§6 item 6) and has no second consumer, so nothing sends it and nothing would receive it.
 - **`code.ts` always sets `message = ERROR_TEXT[code]`.** For a *received* `error` the UI renders `error.message` verbatim and never re-derives it from the code. The UI imports `ERROR_TEXT` only for its own `no-selection` state (§6 item 1), which no message precedes. Either way the text exists once, in `protocol.ts`.
 
 ### 3.1 `src/code.ts`
 
 ```ts
 const UI_SIZE = { width: 400, height: 560, themeColors: true, title: 'SVG Smash' } as const;
-const exportSettings = (s: SvgExportSettings): ExportSettingsSVGString => ({ format: 'SVG_STRING', ...s });
+// Ids are always on: with them off, exportAsync drops <g> wrappers that only carry a blend mode.
+const exportSettings = (s: SvgExportSettings): ExportSettingsSVGString =>
+  ({ format: 'SVG_STRING', svgIdAttribute: true, ...s });
 const yieldToHost = () => new Promise<void>((r) => setTimeout(r, 0));
 
 function describeSelection(): SelectionItem[];   // pure read of figma.currentPage.selection
@@ -285,7 +286,7 @@ Either way, then `export-end {total:0, exported:0, failed:0}`. Otherwise post `e
 
 `ui-progress` does not exist; the sandbox receives only `ui-ready`, `export-request`, `ui-done`, `ui-error` and `close`, and an unknown `type` is ignored.
 
-`svgIdAttribute` defaults to **on**, against Figma's own default, because the flag is not only about ids: with it off, `exportAsync` drops `<g>` wrappers whose only attribute is `style="mix-blend-mode:…"` (§8), which silently changes how the file paints. `svgOutlineText` defaults to **off**, again against Figma's default, so `<text>` and font names survive the round trip. Both are user-visible switches (§6) rather than constants: the ids cost a layer-name id on every element, and live text needs the font installed on the viewing machine.
+`svgIdAttribute` is **hard-wired on**, against Figma's own default, because the flag is not only about ids: with it off, `exportAsync` drops `<g>` wrappers whose only attribute is `style="mix-blend-mode:…"` (§8), which silently changes how the file paints. It is written in `exportSettings` rather than offered as a switch — the only thing ids cost is a layer-name id on every element, and no export is worth the paint bug. `svgOutlineText` defaults to **off**, again against Figma's default, so `<text>` and font names survive the round trip; it stays a user-visible switch (§6) because live text needs the font installed on the viewing machine.
 
 `ui-done` → `figma.notify(...)` (≤100 chars) and the plugin stays open so the user can re-run at another quality. The string is composed here from the message's counts — `Exported 3 files — 89% smaller.` — deliberately without byte formatting: `formatBytes` lives in `src/ui/format.ts`, and importing it would pull a UI module into `dist/code.js` for one notification. `ui-error` → `figma.notify(msg, { error: true })`. `close` → `figma.closePlugin(); return;`.
 
@@ -775,16 +776,15 @@ Layout, top to bottom:
 1. Selection line — "3 layers selected" / "Nothing selected — pick a frame or component on the canvas." In the `no-selection` state the line is followed by `ERROR_TEXT['no-selection']`, rendered from the protocol table rather than retyped. The export button is disabled in that state, so the sandbox's `no-selection` error is otherwise unreachable and the spec's "errors clearly if nothing selected" would rest on the selection line alone.
 2. Quality — `<input type="range" min="1" max="100" step="1" value="85">` with a live numeric readout. Sub-label: "85 is a good default. Lower means smaller and softer."
 3. Downscale — `<input type="checkbox">`, unchecked, label "Downscale to displayed size ×2", hint "Re-samples oversized bitmaps. Geometry is unchanged."
-4. Include ids — `<input type="checkbox">`, label `Include "id" attribute`, hint "Keep on: with ids off, Figma drops groups that only carry a blend mode."
-5. Outline text — `<input type="checkbox">`, label "Outline text", hint "Off keeps `<text>` and font names; viewers need the font installed."
-6. Export button, primary, full width.
-7. Progress — `<progress max>` plus "Frame 2 of 3 — image 4 of 7", fed by the `svg` message's `index`/`total` and `deps.onProgress`.
-8. Results list, one `<li>` per `ImageReport`, two lines each — the image name, then `969 KB → 170 KB (converted)`. The name is `name ?? elementId ?? 'image ' + (index + 1)`; both byte counts come from `formatBytes`. Action labels come from a table: `converted` → "converted", `deduped` → "same as #1", `kept-not-smaller` → "kept, WebP was bigger", `skipped-unsupported` → "skipped, already compressed", `failed` → "kept, encode failed" (amber, not red — the export succeeded). A downscaled item adds `, 1800×410 → 1190×271 (pattern-chain)` after the label. Footer per file: "certificate.svg — 3.9 MB → 412 KB (−89%)" plus the "Save again" link. Grand total line when more than one node.
-9. Error box — one sentence plus the raw error under `<details>`.
+4. Outline text — `<input type="checkbox">`, label "Outline text", hint "Off keeps `<text>` and font names; viewers need the font installed."
+5. Export button, primary, full width.
+6. Progress — `<progress max>` plus "Frame 2 of 3 — image 4 of 7", fed by the `svg` message's `index`/`total` and `deps.onProgress`.
+7. Results list, one `<li>` per `ImageReport`, two lines each — the image name, then `969 KB → 170 KB (converted)`. The name is `name ?? elementId ?? 'image ' + (index + 1)`; both byte counts come from `formatBytes`. Action labels come from a table: `converted` → "converted", `deduped` → "same as #1", `kept-not-smaller` → "kept, WebP was bigger", `skipped-unsupported` → "skipped, already compressed", `failed` → "kept, encode failed" (amber, not red — the export succeeded). A downscaled item adds `, 1800×410 → 1190×271 (pattern-chain)` after the label. Footer per file: "certificate.svg — 3.9 MB → 412 KB (−89%)" plus the "Save again" link. Grand total line when more than one node.
+8. Error box — one sentence plus the raw error under `<details>`.
 
-Items 4 and 5 are the export panel's two switches, labelled exactly as Figma labels them so the two panels read the same. Their initial checked state is written from `DEFAULT_SVG_EXPORT` (§3) at init, never as a `checked` attribute in the template — one declaration of the default, on the wire type. They are read at export time by `readExportSettings()` and travel on `export-request`.
+Item 4 is the export panel's switch, labelled exactly as Figma labels it so the two panels read the same. Its initial checked state is written from `DEFAULT_SVG_EXPORT` (§3) at init, never as a `checked` attribute in the template — one declaration of the default, on the wire type. It is read at export time by `readExportSettings()` and travels on `export-request`. `svgIdAttribute` has no control: it is hard-wired on in the sandbox (§3.1).
 
-Changing quality, the downscale toggle or either export switch in the done state re-enables the export button; the shown result is stale. Nothing wires this per control: `STATE_VIEW['done']` already enables the button, so every control has the same effect by construction.
+Changing quality, the downscale toggle or the export switch in the done state re-enables the export button; the shown result is stale. Nothing wires this per control: `STATE_VIEW['done']` already enables the button, so every control has the same effect by construction.
 
 ```ts
 // src/ui/format.ts — pure
@@ -999,7 +999,7 @@ Flags: `--case=<id>`, `--keep-out`.
 
 - `exportAsync({ format: 'SVG_STRING' })` returns `Promise<string>`; `{ format: 'SVG' }` returns `Uint8Array`. https://developers.figma.com/docs/plugins/api/properties/nodes-exportasync/
 - `svgOutlineText` defaults to `true` (text exports as paths, no font loading); `svgIdAttribute` defaults to `false`. https://developers.figma.com/docs/plugins/api/ExportSettings/
-- **OBSERVED, not documented: with `svgIdAttribute: false`, `exportAsync` drops `<g>` wrappers whose only attribute is `style="mix-blend-mode:…"`.** Seen 2026-09-15 on a real certificate frame — three groups lost (hue, lighten, soft-light), so a gradient that should tint the image underneath painted flat purple over it. The same frame exported from Figma's own UI panel with ids on kept all three. Confirmed 2026-09-15: `exportAsync({ format: 'SVG_STRING', svgIdAttribute: true, svgOutlineText: false })` on the same frame (948:2215) is byte-identical to the UI export outside the image payloads (FNV-1a of the payload-stripped text matches), keeps all three groups, and the transformed file renders with 0 differing pixels against the original in both Chromium 149 and WebKit 26.5. The flag therefore defaults to on here (§3.1) and is a user-visible switch (§6 item 4).
+- **OBSERVED, not documented: with `svgIdAttribute: false`, `exportAsync` drops `<g>` wrappers whose only attribute is `style="mix-blend-mode:…"`.** Seen 2026-09-15 on a real certificate frame — three groups lost (hue, lighten, soft-light), so a gradient that should tint the image underneath painted flat purple over it. The same frame exported from Figma's own UI panel with ids on kept all three. Confirmed 2026-09-15: `exportAsync({ format: 'SVG_STRING', svgIdAttribute: true, svgOutlineText: false })` on the same frame (948:2215) is byte-identical to the UI export outside the image payloads (FNV-1a of the payload-stripped text matches), keeps all three groups, and the transformed file renders with 0 differing pixels against the original in both Chromium 149 and WebKit 26.5. The flag is therefore hard-wired on here (§3.1) rather than offered as a switch — no export wants the paint bug, so there is nothing to choose.
 - `exportAsync` comes from `ExportMixin`; `SceneNode` does not guarantee it — narrow with `'exportAsync' in node`.
 - Structured clone across the boundary accepts objects, arrays, numbers, strings, booleans, `null`, `undefined`, `Date`, `Uint8Array`; it rejects `Blob`, `ArrayBuffer` and every other TypedArray. UI→plugin needs the `{ pluginMessage }` wrapper, plugin→UI does not. https://developers.figma.com/docs/plugins/creating-ui/
 - `documentAccess: "dynamic-page"` is required for new plugins; no-network is exactly `"networkAccess": { "allowedDomains": ["none"] }`; current `api` string is `"1.0.0"`; a local-dev `id` is arbitrary. https://developers.figma.com/docs/plugins/manifest/
