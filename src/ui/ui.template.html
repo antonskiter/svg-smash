@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SVG Smash</title>
+<style>
+:root {
+  --bg: var(--figma-color-bg, #ffffff);
+  --bg-secondary: var(--figma-color-bg-secondary, #f5f5f5);
+  --bg-hover: var(--figma-color-bg-hover, #f0f0f0);
+  --text: var(--figma-color-text, #000000);
+  --text-secondary: var(--figma-color-text-secondary, #6b6b6b);
+  --text-brand: var(--figma-color-text-brand, #0d99ff);
+  --text-danger: var(--figma-color-text-danger, #d93025);
+  --text-warning: var(--figma-color-text-warning, #a07b00);
+  --border: var(--figma-color-border, #e6e6e6);
+  --bg-brand: var(--figma-color-bg-brand, #0d99ff);
+  --bg-brand-hover: var(--figma-color-bg-brand-hover, #007be5);
+  --text-onbrand: var(--figma-color-text-onbrand, #ffffff);
+  --bg-disabled: var(--figma-color-bg-disabled, #e6e6e6);
+  --text-disabled: var(--figma-color-text-disabled, #b3b3b3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 12px 16px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+h2 { font-weight: 600; margin: 0 0 4px; }
+p { margin: 0; }
+
+.stack > * + * { margin-top: 12px; }
+
+.selection { font-weight: 600; }
+.hint { color: var(--text-secondary); }
+.danger { color: var(--text-danger); }
+.warning { color: var(--text-warning); }
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.row input[type="range"] { flex: 1; }
+.readout { min-width: 24px; text-align: right; font-variant-numeric: tabular-nums; }
+
+label { user-select: none; }
+
+button {
+  width: 100%;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg-brand);
+  color: var(--text-onbrand);
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover:enabled { background: var(--bg-brand-hover); }
+button:disabled { background: var(--bg-disabled); color: var(--text-disabled); cursor: default; }
+
+progress { width: 100%; height: 4px; }
+
+.images { list-style: none; margin: 0; padding: 0; }
+.images li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.images .name { display: block; }
+.images .size { display: block; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.images li.failed .size { color: var(--text-warning); }
+
+.file + .file { margin-top: 12px; }
+.file-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-weight: 600; }
+.file-foot a { color: var(--text-brand); font-weight: 400; }
+.total { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); font-weight: 600; }
+
+details { margin-top: 8px; color: var(--text-secondary); }
+pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="stack">
+  <div>
+    <p class="selection" id="selection-line">Loading…</p>
+    <p class="hint" id="selection-hint" hidden></p>
+  </div>
+
+  <div class="stack" data-section="controls">
+    <div class="field">
+      <label for="quality">Quality</label>
+      <div class="row">
+        <input type="range" id="quality" min="1" max="100" step="1" value="85">
+        <span class="readout" id="quality-value">85</span>
+      </div>
+      <p class="hint">85 is a good default. Lower means smaller and softer.</p>
+    </div>
+
+    <div class="field">
+      <div class="row">
+        <input type="checkbox" id="downscale">
+        <label for="downscale">Downscale to displayed size ×2</label>
+      </div>
+      <p class="hint">Re-samples oversized bitmaps. Geometry is unchanged.</p>
+    </div>
+
+    <div class="field">
+      <div class="row">
+        <input type="checkbox" id="svg-id-attribute">
+        <label for="svg-id-attribute">Include "id" attribute</label>
+      </div>
+      <p class="hint">Keep on: with ids off, Figma drops groups that only carry a blend mode.</p>
+    </div>
+
+    <div class="field">
+      <div class="row">
+        <input type="checkbox" id="svg-outline-text">
+        <label for="svg-outline-text">Outline text</label>
+      </div>
+      <p class="hint">Off keeps &lt;text&gt; and font names; viewers need the font installed.</p>
+    </div>
+  </div>
+
+  <button id="export" type="button" disabled>Export as WebP SVG</button>
+
+  <div class="stack" data-section="progress" hidden>
+    <progress id="progress" max="1" value="0"></progress>
+    <p class="hint" id="progress-text"></p>
+  </div>
+
+  <div data-section="results" hidden>
+    <p class="warning" id="results-banner" hidden></p>
+    <p class="hint" id="results-many" hidden>Figma desktop may ask where to save each file.</p>
+    <div id="results"></div>
+    <p class="total" id="results-total" hidden></p>
+  </div>
+
+  <div data-section="error" hidden>
+    <p class="danger" id="error-text"></p>
+    <details id="error-details" hidden>
+      <summary>Details</summary>
+      <pre id="error-raw"></pre>
+    </details>
+  </div>
+</div>
+<!--@TRANSFORM@-->
+<!--@UI@-->
+</body>
+</html>

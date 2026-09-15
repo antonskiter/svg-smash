@@ -1,0 +1,22 @@
+{
+  "name": "svg-smash",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc -p tsconfig.code.json && tsc -p tsconfig.ui.json",
+    "test": "npm run build && node test/run.mjs",
+    "test:only": "node test/run.mjs",
+    "check": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "1.138.0",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "playwright": "1.61.1",
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0"
+  }
+}
