@@ -195,7 +195,7 @@ Test files are `.mjs` and are not typechecked.
 ```json
 {
   "name": "SVG Smash",
-  "id": "svg-smash-local",
+  "id": "1681717935402513762",
   "api": "1.0.0",
   "editorType": ["figma"],
   "main": "dist/code.js",
