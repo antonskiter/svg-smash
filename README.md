@@ -1,7 +1,7 @@
 # SVG Smash
 
 A Figma plugin that exports the current selection as SVG with every embedded PNG/JPEG re-encoded
-as WebP. Figma's own SVG export embeds bitmaps as uncompressed base64 PNG — a 595×842 certificate
+as WebP. Figma's own SVG export embeds bitmaps as uncompressed base64 PNG — a 595×842 frame with five image fills
 with five image fills comes out at 3.9 MB. The geometry is untouched: only the `data:` URI inside
 each `(xlink:)href` attribute is replaced.
 

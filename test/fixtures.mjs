@@ -21,7 +21,7 @@ export const NOISE_BLOCK = 16;
 
 // The `data-name` Figma writes next to the id of the first `figma-like` <image>. Exported so the
 // case table asserts the same literal the fixture embeds.
-export const FIGMA_LIKE_IMAGE_NAME = 'seal (1).png';
+export const FIGMA_LIKE_IMAGE_NAME = 'photo (1).png';
 
 // 2x2 GIF89a: 6-byte signature, 2x2 logical screen, 2-entry global colour table,
 // hand-packed LZW for the pixels [0,1,1,0] (round-trip verified against a decoder).
